@@ -22,11 +22,12 @@ class Transaction {
    *     other properties, signed with the provided private key
    */
   constructor(privateKey, recipient, amount) {
-    // Enter your solution here
-
+    this.source = signing.getPublicKey(privateKey);
+    this.recipient = recipient;
+    this.amount = amount;
+    this.signature = signing.sign(privateKey, this.source + recipient + amount);
   }
 }
-
 /**
  * A Block class for storing an array of transactions and the hash of a
  * previous block. Includes a method to calculate and set its own hash.
@@ -44,8 +45,10 @@ class Block {
    *   - hash: a unique hash string generated from the other properties
    */
   constructor(transactions, previousHash) {
-    // Your code here
-
+    this.transactions = transactions;
+    this.previousHash = previousHash;
+    this.nonce = 1000;
+    this.calculateHash(this.nonce);
   }
 
   /**
@@ -58,8 +61,9 @@ class Block {
    *   properties change.
    */
   calculateHash(nonce) {
-    // Your code here
-
+    let toHash = this.transactions.reduce((hash, trans) => trans.signature + hash, '');
+    this.hash = createHash("sha256").update(toHash + nonce + this.previousHash).digest('hex');
+    this.nonce = nonce;
   }
 }
 
@@ -78,16 +82,14 @@ class Blockchain {
    *   - blocks: an array of blocks, starting with one genesis block
    */
   constructor() {
-    // Your code here
-
+    this.blocks = [new Block([], null)];
   }
 
   /**
    * Simply returns the last block added to the chain.
    */
   getHeadBlock() {
-    // Your code here
-
+    return this.blocks[this.blocks.length - 1];
   }
 
   /**
@@ -95,8 +97,8 @@ class Blockchain {
    * adding it to the chain.
    */
   addBlock(transactions) {
-    // Your code here
-
+    let prevHash = this.blocks.length ? this.blocks[this.blocks.length - 1].hash : 'null';
+    this.blocks.push(new Block(transactions, prevHash));
   }
 
   /**
@@ -108,9 +110,8 @@ class Blockchain {
    *   keys will have a negative balance. That's okay, we'll address it when
    *   we make the blockchain mineable later.
    */
-  getBalance(publicKey) {
-    // Your code here
-
+  getBalance(pubK) {
+    return this.blocks.reduce((s, b) => s + b.transactions.reduce((is, t) => t.recipient === pubK ? is + t.amount : is - t.amount, 0), 0);
   }
 }
 
