@@ -3,7 +3,8 @@
 const secp256k1 = require('secp256k1');
 const { randomBytes, createHash } = require('crypto');
 
-
+let toBytes = hex => Buffer.from(hex, 'hex');
+let sha256 = msg => createHash("sha256").update(msg).digest();
 /**
  * A function which generates a new random Secp256k1 private key, returning
  * it as a 64 character hexadecimal string.
@@ -15,9 +16,13 @@ const { randomBytes, createHash } = require('crypto');
  */
 const createPrivateKey = () => {
   // Enter your solution here
+  let privKey;
+  do {
+    privKey = randomBytes(32);
+  } while (!secp256k1.privateKeyVerify(privKey));
 
+  return privKey.toString('hex');
 };
-
 /**
  * A function which takes a hexadecimal private key and returns its public pair
  * as a 66 character hexadecimal string.
@@ -32,10 +37,11 @@ const createPrivateKey = () => {
  *   not hex strings! You'll have to convert the private key.
  */
 const getPublicKey = privateKey => {
-  // Your code here
-
+  let privBuf = toBytes(privateKey);
+  let pub = secp256k1.publicKeyCreate(privBuf);
+ 
+  return pub.toString('hex');
 };
-
 /**
  * A function which takes a hex private key and a string message, returning
  * a 128 character hexadecimal signature.
@@ -50,10 +56,11 @@ const getPublicKey = privateKey => {
  *   not the message itself!
  */
 const sign = (privateKey, message) => {
-  // Your code here
-
+  let bufferMSG = createHash("sha256").update(message).digest();
+  let pkBuffer = toBytes(privateKey);
+  let singedObj = secp256k1.sign(bufferMSG, pkBuffer);
+  return singedObj.signature.toString('hex');
 };
-
 /**
  * A function which takes a hex public key, a string message, and a hex
  * signature, and returns either true or false.
@@ -64,9 +71,8 @@ const sign = (privateKey, message) => {
  *   console.log( verify(publicKey, 'Hello World?', signature) );
  *   // false
  */
-const verify = (publicKey, message, signature) => {
-  // Your code here
-
+const verify = (publicKey, message, signature) => { 
+  return secp256k1.verify(sha256(message), toBytes(signature), toBytes(publicKey));
 };
 
 module.exports = {
