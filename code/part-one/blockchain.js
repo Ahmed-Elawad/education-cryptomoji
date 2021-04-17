@@ -2,7 +2,8 @@
 
 const { createHash } = require('crypto');
 const signing = require('./signing');
-
+let toBytes = hex => Buffer.from(hex, 'hex');
+let sha256 = str => createHash("sha256").update(str).digest();
 
 /**
  * A simple signed Transaction class for sending funds from the signer to
@@ -21,11 +22,11 @@ class Transaction {
    *   - signature: a unique signature generated from a combination of the
    *     other properties, signed with the provided private key
    */
-  constructor(privateKey, recipient, amount) {
-    this.source = signing.getPublicKey(privateKey);
-    this.recipient = recipient;
+  constructor(pk, pubKey, amount) {
+    this.source = signing.getPublicKey(pk);
+    this.recipient = pubKey;
     this.amount = amount;
-    this.signature = signing.sign(privateKey, this.source + recipient + amount);
+    this.signature = signing.sign(pk, this.source + pubKey + amount);
   }
 }
 /**
@@ -47,8 +48,8 @@ class Block {
   constructor(transactions, previousHash) {
     this.transactions = transactions;
     this.previousHash = previousHash;
-    this.nonce = 1000;
-    this.calculateHash(this.nonce);
+    this.nonce = 0;
+    this.hash = this.calculateHash();
   }
 
   /**
@@ -61,9 +62,9 @@ class Block {
    *   properties change.
    */
   calculateHash(nonce) {
-    let toHash = this.transactions.reduce((hash, trans) => trans.signature + hash, '');
-    this.hash = createHash("sha256").update(toHash + nonce + this.previousHash).digest('hex');
-    this.nonce = nonce;
+    let sigs = this.transactions.map(tr => tr.signature).join('');
+    let hash = sha256(sigs + nonce + this.previousHash);
+    this.hash = hash.toString('hex');
   }
 }
 
@@ -82,7 +83,8 @@ class Blockchain {
    *   - blocks: an array of blocks, starting with one genesis block
    */
   constructor() {
-    this.blocks = [new Block([], null)];
+    let genesis = new Block([], null);
+    this.blocks = [genesis];
   }
 
   /**
@@ -97,7 +99,7 @@ class Blockchain {
    * adding it to the chain.
    */
   addBlock(transactions) {
-    let prevHash = this.blocks.length ? this.blocks[this.blocks.length - 1].hash : 'null';
+    let prevHash = this.blocks[this.blocks.length -1].hash;
     this.blocks.push(new Block(transactions, prevHash));
   }
 
@@ -111,7 +113,14 @@ class Blockchain {
    *   we make the blockchain mineable later.
    */
   getBalance(pubK) {
-    return this.blocks.reduce((s, b) => s + b.transactions.reduce((is, t) => t.recipient === pubK ? is + t.amount : is - t.amount, 0), 0);
+    let amount = this.blocks.reduce((bt, b) => {
+      return b.transactions.reduce((tt, t) => {
+        if (t.recipient === pubK) return tt + t.amount;
+        if (t.source === pubK) return tt - t.amount;
+        return tt;
+      }, 0);
+    }, 0);
+    return amount;
   }
 }
 

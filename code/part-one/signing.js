@@ -4,7 +4,7 @@ const secp256k1 = require('secp256k1');
 const { randomBytes, createHash } = require('crypto');
 
 let toBytes = hex => Buffer.from(hex, 'hex');
-let sha256 = msg => createHash("sha256").update(msg).digest();
+let sha256 = str => createHash("sha256").update(str).digest();
 /**
  * A function which generates a new random Secp256k1 private key, returning
  * it as a 64 character hexadecimal string.
@@ -15,7 +15,6 @@ let sha256 = msg => createHash("sha256").update(msg).digest();
  *   // 'e291df3eede7f0c520fddbe5e9e53434ff7ef3c0894ed9d9cbcb6596f1cfe87e'
  */
 const createPrivateKey = () => {
-  // Enter your solution here
   let privKey;
   do {
     privKey = randomBytes(32);
@@ -37,10 +36,10 @@ const createPrivateKey = () => {
  *   not hex strings! You'll have to convert the private key.
  */
 const getPublicKey = privateKey => {
-  let privBuf = toBytes(privateKey);
-  let pub = secp256k1.publicKeyCreate(privBuf);
- 
-  return pub.toString('hex');
+  let pkByte = toBytes(privateKey);
+  let pubKey = secp256k1.publicKeyCreate(pkByte);
+  return pubKey.toString('hex');
+  // return pub key
 };
 /**
  * A function which takes a hex private key and a string message, returning
@@ -56,11 +55,19 @@ const getPublicKey = privateKey => {
  *   not the message itself!
  */
 const sign = (privateKey, message) => {
-  let bufferMSG = createHash("sha256").update(message).digest();
-  let pkBuffer = toBytes(privateKey);
-  let singedObj = secp256k1.sign(bufferMSG, pkBuffer);
-  return singedObj.signature.toString('hex');
+  //  convert pk to buffer
+  // convert msg to buffer? then sha
+  let pk = toBytes(privateKey);
+  let msg = sha256(message);
+  let sig;
+  try {
+    sig = secp256k1.sign(msg, pk);
+  } catch(e) {
+    console.log(e);
+  }
+  return sig.signature.toString('hex');
 };
+
 /**
  * A function which takes a hex public key, a string message, and a hex
  * signature, and returns either true or false.
@@ -71,8 +78,19 @@ const sign = (privateKey, message) => {
  *   console.log( verify(publicKey, 'Hello World?', signature) );
  *   // false
  */
-const verify = (publicKey, message, signature) => { 
-  return secp256k1.verify(sha256(message), toBytes(signature), toBytes(publicKey));
+const verify = (publicKey, message, signature) => {
+  debugger;
+  let pubK = toBytes(publicKey);
+  message = sha256(message);
+  signature = toBytes(signature);
+  
+  let valid;
+  try{
+    valid = secp256k1.verify(message, signature, pubK);
+  } catch(e) {
+    console.log(e);
+  }
+  return valid;
 };
 
 module.exports = {
