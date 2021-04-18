@@ -2,7 +2,6 @@
 
 const { createHash } = require('crypto');
 const signing = require('./signing');
-let toBytes = hex => Buffer.from(hex, 'hex');
 let sha256 = str => createHash("sha256").update(str).digest();
 
 /**
@@ -48,8 +47,8 @@ class Block {
   constructor(transactions, previousHash) {
     this.transactions = transactions;
     this.previousHash = previousHash;
-    this.nonce = 0;
-    this.hash = this.calculateHash();
+    this.nonce = transactions.reduce((v, t) => v + t.amount, 0);
+    this.calculateHash(this.nonce);
   }
 
   /**
@@ -64,6 +63,7 @@ class Block {
   calculateHash(nonce) {
     let sigs = this.transactions.map(tr => tr.signature).join('');
     let hash = sha256(sigs + nonce + this.previousHash);
+    this.nonce = nonce;
     this.hash = hash.toString('hex');
   }
 }
