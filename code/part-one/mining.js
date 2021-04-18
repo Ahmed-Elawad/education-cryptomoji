@@ -2,8 +2,8 @@
 
 const { createHash } = require('crypto');
 const signing = require('./signing');
-const { Block, Blockchain } = require('./blockchain');
-
+const { Block, Blockchain, Transaction } = require('./blockchain');
+let sha256 = str => createHash("sha256").update(str).digest();
 
 /**
  * A slightly modified version of a transaction. It should work mostly the
@@ -19,7 +19,15 @@ class MineableTransaction {
    */
   constructor(privateKey, recipient = null, amount) {
     // Enter your solution here
-
+    if (!recipient) {
+      this.source = null;
+      this.recipient = signing.getPublicKey(privateKey);
+    } else {
+      this.source = signing.getPublicKey(privateKey);
+      this.recipient = recipient;
+    }
+    this.amount = amount;
+    this.signature = signing.sign(privateKey, this.source + this.recipient + amount);
   }
 }
 
@@ -35,7 +43,9 @@ class MineableBlock extends Block {
    */
   constructor(transactions, previousHash) {
     // Your code here
-
+    super(transactions, previousHash);
+    this.hash = undefined;
+    this.nonce = undefined;
   }
 }
 
@@ -62,8 +72,13 @@ class MineableChain extends Blockchain {
    *   This will only be used internally.
    */
   constructor() {
-    // Your code here
-
+    // initialize the blocks array
+    // create difficult and reward properties
+    // create pendingTransactions array? queue?
+    super();
+    this.reward = 2;
+    this.difficulty = 3;
+    this.pendingTransactions = [];
   }
 
   /**
@@ -78,8 +93,7 @@ class MineableChain extends Blockchain {
    * mineable transaction and simply store it until it can be mined.
    */
   addTransaction(transaction) {
-    // Your code here
-
+    this.pendingTransactions.push(transaction);
   }
 
   /**
@@ -97,8 +111,30 @@ class MineableChain extends Blockchain {
    *   Don't forget to clear your pending transactions after you're done.
    */
   mine(privateKey) {
-    // Your code here
+    // mine block: aka find matching transaction
+    // get: pending transactions
+    let pendingTs = this.pendingTransactions;
+    // new transaction: privateKey, recipient(me), amount = reward
+    // create new transaction
+    pendingTs.push(new MineableTransaction(privateKey, null, this.reward));
+    let lastBlock = this.getHeadBlock();
+    let prevHash = lastBlock.hash;
+    let newBlock = new MineableBlock(pendingTs, prevHash);
+    let nonce = 0;
+    newBlock.calculateHash(nonce);
+    while (!newBlock.hash || newBlock.hash.slice(0, this.difficulty) !== '000') {
+      nonce += 1;
+      newBlock.calculateHash(nonce);
+    }
+      // create new block signature using transaction sigs
+      // if first x of hash === this.dificulty
+        // add transaction to block
+        // add block to blockchain
+        // clear transactions
 
+    this.pendingTransactions = [];
+    this.blocks.push(newBlock);
+    return;
   }
 }
 
@@ -117,10 +153,49 @@ class MineableChain extends Blockchain {
  *   - any public key that ever goes into a negative balance by sending
  *     funds they don't have
  */
-const isValidMineableChain = blockchain => {
-  // Your code here
+ const isValidMineableChain = blockchain => {
+  const zeros = '0'.repeat(blockchain.difficulty);
+  const { blocks } = blockchain;
 
+  // All blocks other than genesis begin with the right number of zeros
+  if (blocks.slice(1).some(b => b.hash.slice(0, zeros.length) !== zeros)) {
+    return false;
+  }
+
+  const balances = {};
+
+  for (const { transactions } of blocks) {
+    const rewards = transactions.filter(t => !t.source);
+
+    // The block has no more than one reward transaction
+    if (rewards.length > 1) {
+      return false;
+    }
+
+    // If present, the reward transaction has the correct amount
+    if (rewards[0] && rewards[0].amount !== blockchain.reward) {
+      return false;
+    }
+
+    // Each transaction only withdraws from keys with enough funds
+    for (const { source, recipient, amount } of transactions) {
+      if (source) {
+        balances[source] = balances[source] || 0;
+        balances[source] = balances[source] - amount;
+
+        if (balances[source] < 0) {
+          return false;
+        }
+      }
+
+      balances[recipient] = balances[recipient] || 0;
+      balances[recipient] = balances[recipient] + amount;
+    }
+  }
+
+  return true;
 };
+
 
 module.exports = {
   MineableTransaction,
